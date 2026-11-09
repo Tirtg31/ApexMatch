@@ -39,6 +39,7 @@ builder.Services.AddScoped<IPositionRepository, PositionRepository>();
 builder.Services.AddScoped<IOrderRepository, OrderRepository>();
 builder.Services.AddScoped<IExecutionRepository, ExecutionRepository>();
 builder.Services.AddScoped<IInstrumentRepository, InstrumentRepository>();
+builder.Services.AddSingleton<IMarketPriceStore, MarketPriceStore>();
 
 // Unit of Work
 builder.Services.AddScoped<IUnitOfWork, EfUnitOfWork>();
