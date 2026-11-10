@@ -1,6 +1,10 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using System.Diagnostics.Metrics;
+using TradingEngine.Api.DTOs;
 using TradingEngine.Api.DTOs.Instrument;
 using TradingEngine.Core.Entities;
+using TradingEngine.Core.Interfaces.Repositories.MarketData;
+using TradingEngine.Infrastructure.MarketData;
 using TradingEngine.Infrastructure.Persistence.Repositories;
 
 namespace TradingEngine.Api.Controllers
@@ -9,9 +13,11 @@ namespace TradingEngine.Api.Controllers
     public class InstrumentController : ControllerBase
     {
         private readonly IInstrumentRepository instrumentRepository;
-        public InstrumentController(IInstrumentRepository instrumentRepository)
+        private readonly IMarketPriceStore marketPriceStore;
+        public InstrumentController(IInstrumentRepository instrumentRepository, IMarketPriceStore marketPriceStore)
         {
             this.instrumentRepository = instrumentRepository;
+            this.marketPriceStore = marketPriceStore;
         }
         [HttpGet("instruments")]
         public async Task<ActionResult<List<InstrumentResponseDto>>> GetAllInstruments()
@@ -44,6 +50,49 @@ namespace TradingEngine.Api.Controllers
                 IsActive = instrument.IsActive
             };
             return Ok(response);
+        }
+
+        [HttpGet("{id:int}/price")]
+        public async Task<ActionResult<MarketPriceResponseDto>> GetPrice(int id, CancellationToken ct)
+        {
+            if (id <= 0)
+                return BadRequest("Instrument ID must be positive.");
+
+            TradeInstrument? instrument = await instrumentRepository.GetByIdAsync(id, ct);
+
+            if (instrument == null)
+                return NotFound($"Instrument with ID {id} not found.");
+
+            bool found = marketPriceStore.TryGetPrice(instrument.InstrumentSymbol,out MarketPrice? marketPrice);
+            if (!found || marketPrice == null)
+            {
+                return StatusCode(StatusCodes.Status503ServiceUnavailable, $"Market price for {instrument.InstrumentSymbol} is not available.");
+            }
+
+            MarketPriceResponseDto response = new MarketPriceResponseDto
+            {
+                InstrumentId = instrument.InstrumentId,
+                InstrumentSymbol = marketPrice.InstrumentSymbol,
+                Price = marketPrice.Price,
+                LastUpdatedUtc = marketPrice.LastUpdatedUtc,
+                Provider = marketPrice.Provider
+            };
+            return Ok(response);
+        }
+        [HttpGet("api/instruments/prices")]
+        public ActionResult<IReadOnlyCollection<MarketPriceResponseDto>> GetAllPrices()
+        {
+            IReadOnlyCollection<MarketPrice> allPrices=marketPriceStore.GetAllPrices();
+            IReadOnlyCollection<MarketPriceResponseDto> responeList = allPrices.Select(it => new MarketPriceResponseDto
+            {
+                InstrumentId = null,
+                InstrumentSymbol = it.InstrumentSymbol,
+                Price = it.Price,
+                LastUpdatedUtc = it.LastUpdatedUtc,
+                Provider = it.Provider
+            }).ToArray();
+
+            return Ok(responeList);
         }
     }
 }
