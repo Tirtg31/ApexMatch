@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using TradingEngine.Api.BackgroundServices;
 using TradingEngine.Api.Exceptions;
 using TradingEngine.Core.Interfaces.Repositories;
 using TradingEngine.Core.Interfaces.Repositories.MarketData;
@@ -33,6 +34,10 @@ builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 
 builder.Services.AddSingleton<TradingRuntimeState>();
 builder.Services.AddSingleton<OrderMatchingEngine>();
+
+//Background service
+builder.Services.AddHostedService<MarketPriceBackgroundService>();
+
 // Repositories
 builder.Services.AddScoped<IAccountRepository, AccountRepository>();
 builder.Services.AddScoped<IPositionRepository, PositionRepository>();
